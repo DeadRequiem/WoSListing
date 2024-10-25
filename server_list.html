@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Server List</title>
+    <style>
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 4px; text-align: left; }
+        tr:nth-child(even) { background-color: #f7f7f7; }
+        tr:nth-child(odd) { background-color: #dedfdf; }
+        th { background-color: #D5E6E1; }
+    </style>
+</head>
+<body>
+    <table border="1" cellspacing="0" cellpadding="4">
+        <tr bgcolor="#D5E6E1">
+            <th>Server Name</th>
+            <th>Playing</th>
+            <th># Players</th>
+            <th>Rules</th>
+        </tr>
+        
+        {% for server in servers %}
+            <tr>
+                <td>{{ server.name }}</td>
+                <td>{{ server.world }}</td>
+                <td>{{ server.players }}</td>
+                <td>{{ server.rules }}</td>
+            </tr>
+        {% empty %}
+            <tr>
+                <td colspan="4">No servers available</td>
+            </tr>
+        {% endfor %}
+    </table>
+</body>
+</html>
