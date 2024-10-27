@@ -4,6 +4,30 @@
     <meta charset="UTF-8">
     <title>Server List</title>
     <style>
+        /* Light Theme */
+        body.light-theme, table.light-theme, th.light-theme, td.light-theme {
+            background-color: white;
+            color: black;
+        }
+        
+        /* Dark Theme */
+        body.dark-theme, table.dark-theme, th.dark-theme, td.dark-theme {
+            background-color: #333;
+            color: rgb(129, 5, 5);
+        }
+
+        /* Pastel Theme */
+        body.pastel-theme, table.pastel-theme, th.pastel-theme, td.pastel-theme {
+            background-color: #fdf5e6;
+            color: #5f9ea0;
+        }
+
+        /* Weird Theme */
+        body.weird-theme, table.weird-theme, th.weird-theme, td.weird-theme {
+            background-color: #1e0392;
+            color: #913acf;
+        }
+
         table { width: 100%; border-collapse: collapse; }
         th, td { padding: 4px; text-align: left; }
         tr:nth-child(even) { background-color: #f7f7f7; }
@@ -11,8 +35,13 @@
         th { background-color: #D5E6E1; }
     </style>
 </head>
-<body>
-    <table border="1" cellspacing="0" cellpadding="4">
+<body class="light-theme">
+    <!-- Theme Toggle Button -->
+    <div style="text-align: center; margin-top: 10px;">
+        <button id="themeToggle" onclick="cycleTheme()">Toggle Theme</button>
+    </div>
+
+    <table border="1" cellspacing="0" cellpadding="4" id="serverTable">
         <tr bgcolor="#D5E6E1">
             <th>Server Name</th>
             <th>Playing</th>
@@ -33,5 +62,132 @@
             </tr>
         {% endfor %}
     </table>
+    
+    <p style="text-align: center; font-size: 0.9em; color: #666;">
+        {% if last_update %} Last updated: {{ last_update.last_fetched|date:"Y-m-d H:i:s" }} {% endif %}
+    </p>
+
+    <!-- Refresh Now Button -->
+    <div style="text-align: center; margin-top: 20px;">
+        <button id="refreshButton" onclick="refreshData()">Refresh Now</button>
+        <p id="cooldownMessage" style="display: none; color: #666;">Please wait 10 minutes before refreshing again.</p>
+    </div>
+
+    <script>
+        function refreshData() {
+            const refreshButton = document.getElementById("refreshButton");
+            const cooldownMessage = document.getElementById("cooldownMessage");
+
+            fetch("{% url 'refresh_server_data' %}", { method: "GET" })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === "success") {
+                        alert("Server data refreshed successfully.");
+                        startCooldown();
+                    } else {
+                        alert(data.message);
+                    }
+                })
+                .catch(error => console.error("Error:", error));
+        }
+
+        function startCooldown() {
+            const refreshButton = document.getElementById("refreshButton");
+            const cooldownMessage = document.getElementById("cooldownMessage");
+
+            refreshButton.disabled = true;
+            cooldownMessage.style.display = "block";
+
+            setTimeout(() => {
+                refreshButton.disabled = false;
+                cooldownMessage.style.display = "none";
+            }, 600000);  // 10 minutes
+        }
+    </script>
+
+    <style>
+        /* Basic styles for modal */
+        .modal {
+            display: none; 
+            position: fixed;
+            z-index: 1;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0, 0, 0, 0.4);
+        }
+        .modal-content {
+            background-color: #fefefe;
+            margin: 15% auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 40%;
+        }
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+        }
+        .close:hover,
+        .close:focus {
+            color: black;
+            text-decoration: none;
+            cursor: pointer;
+        }
+    </style>
+    
+    <!-- Credits Button -->
+    <div style="text-align: center; margin-top: 20px;">
+        <button onclick="document.getElementById('creditsModal').style.display='block'">Credits</button>
+    </div>
+    
+    <!-- Credits Modal -->
+    <div id="creditsModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="document.getElementById('creditsModal').style.display='none'">&times;</span>
+            <h3>Credits</h3>
+            <p>Starix for the initial CPP code to make this function</p>
+            <p>Felty for <a href="https://mix.ahitb.com/" target="_blank">https://mix.ahitb.com/</a></p>
+            <p>Demi as I built this :)</p>
+        </div>
+    </div>
+    
+    <script>
+        // Theme cycling functionality
+        const themes = ["light-theme", "dark-theme", "pastel-theme", "weird-theme"];
+        
+        document.addEventListener("DOMContentLoaded", function() {
+            const storedTheme = localStorage.getItem("theme") || themes[0];
+            applyTheme(storedTheme);
+        });
+
+        function cycleTheme() {
+            const currentTheme = document.body.className;
+            const currentIndex = themes.indexOf(currentTheme);
+            const nextTheme = themes[(currentIndex + 1) % themes.length];
+            applyTheme(nextTheme);
+        }
+
+        function applyTheme(theme) {
+            themes.forEach(t => {
+                document.body.classList.remove(t);
+                document.getElementById("serverTable").classList.remove(t);
+            });
+            document.body.classList.add(theme);
+            document.getElementById("serverTable").classList.add(theme);
+            localStorage.setItem("theme", theme);
+        }
+
+        // Close the modal if the user clicks outside of it
+        window.onclick = function(event) {
+            const modal = document.getElementById('creditsModal');
+            if (event.target === modal) {
+                modal.style.display = "none";
+            }
+        }
+    </script>
 </body>
 </html>

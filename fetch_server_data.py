@@ -1,7 +1,7 @@
 import socket
 import requests
 from django.core.management.base import BaseCommand
-from ServerList.models import Server
+from ServerList.models import Server, FetchLog
 from django.utils import timezone
 from datetime import datetime
 
@@ -109,4 +109,7 @@ class Command(BaseCommand):
         except socket.timeout:
             self.stdout.write("No response from master server within the timeout period.")
         finally:
+            # Update or create the fetch timestamp
+            FetchLog.objects.update_or_create(id=1, defaults={'last_fetched': timezone.now()})
             sock.close()
+            self.stdout.write("Fetch timestamp updated.")
