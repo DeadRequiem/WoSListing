@@ -3,15 +3,19 @@ from django.http import JsonResponse
 from django.core.management import call_command
 from django.utils import timezone
 from datetime import timedelta
-from .models import Server, FetchLog
+from .models import Server, FetchLog, MasterServer
 
 # Dictionary to track the last refresh time per user IP
 last_refresh_time = {}
 
 def server_list(request):
-    servers = Server.objects.all()
+    # Fetch all active master servers and their associated servers
+    master_servers = MasterServer.objects.filter(is_active=True).prefetch_related('servers')
     last_update = FetchLog.objects.first()
-    return render(request, 'server_list.html', {'servers': servers, 'last_update': last_update})
+    return render(request, 'server_list.html', {
+        'master_servers': master_servers,
+        'last_update': last_update
+    })
 
 def refresh_server_data(request):
     cooldown_period = timedelta(minutes=10)
