@@ -26,6 +26,7 @@ def get_master_ip_port(config_url):
 # Send alias string to query server
 # ---------------------------- #
 def send_alias_str(alias_type, ip, port, sock):
+    # Construct the alias message based on the alias type
     alias_message = (f"{alias_type}alias=fetch,name=TestName,email=test@example.com,"
                      f"loc=TestLocation,sernum=FFFFFF,HHMM=0000,d=1A2B3C4D,v=071DFC29,w=1A2B3C4D")
     sock.sendto(alias_message.encode('utf-8'), (ip, port))
@@ -69,10 +70,33 @@ def parse_server_info(data):
             elif "ules: " in segment:
                 details['rules'] = segment.split("ules: ")[1].strip()
             elif "ReMix" in segment:
-                details['version'] = "ReMix"
+                # Concatenate "ReMix" with any version information found
+                details['version'] = "ReMix " + segment.split("ReMix")[1].strip()
             else:
                 details['version'] = "Mix"  # Default to Mix if 'ReMix' tag is missing
+
     return details
+
+# ---------------------------- #
+# Fetch and Update Online Player Counts
+# ---------------------------- #
+def update_online_player_count(server_ip, server_port, sock):
+    send_alias_str("Q", server_ip, server_port, sock)
+    
+    try:
+        data, _ = sock.recvfrom(1024)
+        serial_numbers = data.decode().lstrip("Q").split(",")
+        
+        # Filter for valid entries: allow hexadecimal or entries starting with "SOUL"
+        serial_numbers = [
+            sn for sn in serial_numbers if sn and 
+            (all(c in '0123456789ABCDEF' for c in sn.upper()) or sn.startswith("SOUL"))
+        ]
+        
+        return len(serial_numbers)
+    except socket.timeout:
+        print(f"[WARNING] Timeout while fetching player count from {server_ip}:{server_port}")
+        return 0
 
 # ---------------------------- #
 # Django Command to Fetch Data
@@ -94,7 +118,6 @@ class Command(BaseCommand):
         # Loop over each active master server to attempt fetching data
         for master in active_masters:
             self.stdout.write(f"Attempting to fetch from master server {master.ip_address}:{master.port}")
-
             sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             sock.settimeout(1.0)
             
@@ -104,7 +127,7 @@ class Command(BaseCommand):
                 data, addr = sock.recvfrom(4096)
                 server_list = parse_master_response(data)
 
-                # Loop over each server entry and fetch additional details
+                # Loop over each server entry and fetch additional details and player count
                 for ip, port, players in server_list:
                     send_alias_str("P", ip, port, sock)
 
@@ -113,24 +136,24 @@ class Command(BaseCommand):
                         server_data, server_addr = sock.recvfrom(1024)
                         server_details = parse_server_info(server_data)
 
-                        # Determine server type (Mix or ReMix) based on parsed details
-                        server_type = server_details.get('version', 'Mix')  # Default to Mix if not found
+                        # Fetch online player count using "Q" alias
+                        player_count = update_online_player_count(ip, port, sock)
 
-                        # Save or update server data in the database
+                        # Save or update server data in the database with actual player count
                         Server.objects.update_or_create(
                             ip_address=ip,
                             port=port,
                             defaults={
-                                'players': players,
+                                'players': player_count,  # Set the accurate player count here
                                 'name': server_details.get('name', 'Unknown Server'),
                                 'world': server_details.get('world', ''),
                                 'rules': server_details.get('rules', ''),
-                                'server_type': server_type,  # Set server type here
-                                'master_server': master      # Link server to the master server
+                                'server_type': server_details.get('version', 'Mix'),  # Set server type
+                                'master_server': master  # Link server to the master server
                             }
                         )
-                        self.stdout.write(f"[{datetime.now()}] Server data saved for {ip}:{port}")
-                    
+                        self.stdout.write(f"[{datetime.now()}] Server data saved for {ip}:{port} with {player_count} players")
+
                     except socket.timeout:
                         # Server did not respond within the timeout
                         Server.objects.update_or_create(
@@ -141,8 +164,8 @@ class Command(BaseCommand):
                                 'name': f"Waiting for Server Ping from {ip}:{port}",
                                 'world': '',
                                 'rules': '',
-                                'server_type': 'Mix',  # Default to Mix if no response
-                                'master_server': master  # Link to the master server
+                                'server_type': 'Mix',
+                                'master_server': master
                             }
                         )
                         self.stdout.write(f"[{datetime.now()}] No response from {ip}:{port}; marked as waiting.")
